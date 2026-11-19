@@ -1,0 +1,33 @@
+
+name: Member 1 - Document Privacy Tests
+
+on:
+  push:
+    branches:
+      - feature/document-privacy
+  pull_request:
+    branches:
+      - develop
+
+jobs:
+  document-privacy-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pytest
+
+      - name: Run Member 1 tests
+        run: |
+          python -m pytest backend/tests/test_no_breach_ui.py -v
