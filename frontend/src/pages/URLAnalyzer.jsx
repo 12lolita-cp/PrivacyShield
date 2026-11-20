@@ -1,0 +1,29 @@
+import React,{useState} from 'react';
+import {Link2, Search, ShieldAlert, ShieldCheck, AlertTriangle, Globe2, Network, ExternalLink, CheckCircle2} from 'lucide-react';
+import {api} from '../api';
+
+export function LiveResult({result,compact=false}){
+ if(!result) return null;
+ const live=result.live_checks||{};
+ const entries=[['DNS lookup',live.dns],['Live redirects',live.redirects]];
+ return <div className="live-report">
+  <div className="live-result-top"><div><span className="eyebrow">URL RISK INDICATOR</span><h2>{result.level==='High'?'High risk indicators identified':result.level==='Moderate'?'Review these risk indicators':result.verification_status==='partial'?'Low structural risk — network checks incomplete':'No listed structural warning patterns'}</h2><p className="muted url-wrap">{result.host} {result.final_url&&result.final_url!==result.url?`→ ${result.final_url}`:''}</p></div><div className={'live-risk-score '+result.level.toLowerCase()}><strong>{result.score}</strong><small>/100</small></div></div>
+  <div className="status-summary"><span className={'risk-badge '+result.level.toLowerCase()}>{result.level} risk indicator</span> <span className="tiny">{result.checks_completed??0}/{result.checks_available??2} checks completed · {result.verification_status==='partial'?'Network checks incomplete':'Network checks completed'}</span></div>
+  {!!result.evidence?.length&&<div className="live-section"><h3>Observed network indicators</h3>{result.evidence.map((x,i)=><div className="signal-row" key={i}><ShieldAlert size={18}/><span>{x.message}<small>{x.source}</small></span></div>)}</div>}
+  <div className="report-note"><ShieldAlert size={18}/><p>{result.coverage_message||'Security verification coverage is unknown.'}</p></div><div className="live-section"><h3>Live verification</h3><div className="check-grid-live">{entries.map(([label,check])=><div className="live-check" key={label}><div><strong>{label}</strong><span className={'check-state '+(check?.status||'unknown')}>{check?.status==='not_configured'?'API key required':check?.status==='unavailable'||check?.status==='error'?'Unable to verify':(check?.status||'unavailable').replaceAll('_',' ')}</span></div><p>{check?.detail||'No result available'}</p>{check?.addresses?.length>0&&<small>{check.addresses.join(', ')}</small>}{check?.stats&&<small>Malicious: {check.stats.malicious} · Suspicious: {check.stats.suspicious} · Harmless: {check.stats.harmless} · Undetected: {check.stats.undetected}</small>}{check?.threats?.length>0&&<small>Matched: {check.threats.join(', ')}</small>}{check?.chain?.length>0&&<small>Hops: {check.chain.map(x=>`${x.status_code} ${x.url}`).join(' → ')}</small>}</div>)}</div></div>
+  <div className="live-section"><h3>Redirect destination (not opened in your browser)</h3>
+    <div className="live-check"><strong>Original website</strong><p className="url-wrap">{result.url}</p><strong>Final website</strong><p className="url-wrap">{live.redirects?.status==='completed' ? (live.redirects.final_url || result.final_url || result.url) : 'Not verified — redirect inspection did not complete'}</p>
+    <strong>Redirect path</strong>{live.redirects?.chain?.length ? live.redirects.chain.map((hop,i)=><p className="url-wrap" key={i}>{i+1}. HTTP {hop.status_code} — {hop.url}{i<live.redirects.chain.length-1?' →':''}</p>) : <p>No verified redirect path available.</p>}
+    <p className="tiny">Only server-side HTTP headers are inspected; PrivacyShield does not navigate your browser to the destination. Some sites use JavaScript-based redirects, which may not be observed.</p></div></div>
+  <div className="live-section"><h3>Why was this scored?</h3><div className="reason-list">{result.reasons?.map((r,i)=><div key={i}>{r.points>0 ? <AlertTriangle size={18}/>:<CheckCircle2 size={18}/>}<p>{r.message}</p>{r.points>0&&<strong>+{r.points}</strong>}</div>)}</div><p className="method-note">{result.scoring_method||'URL patterns are weighted heuristics, not verified malware detections.'}</p></div>
+  <div className="report-note"><ShieldCheck size={18}/><p>{result.disclaimer}</p></div>
+ </div>
+}
+
+export default function URLAnalyzer(){
+ const [url,setUrl]=useState(''),[result,setResult]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+ async function submit(e){e.preventDefault();setBusy(true);setError('');setResult(null);try{setResult(await api('/url/analyze',{method:'POST',body:JSON.stringify({url})}))}catch(e){setError(e.message)}finally{setBusy(false)}}
+ return <><div className="page-heading"><span className="eyebrow">PUBLIC NETWORK AND URL ANALYSIS</span><h1>URL Threat Analyzer</h1><p>Analyze URL structure and run live DNS and redirect checks.</p></div>
+ <div className="panel live-input-panel"><div className="panel-title"><div><h2>Analyze any public website</h2><p>Enter a URL you want to verify</p></div><Globe2/></div><form className="url-form" onSubmit={submit}><div className="url-input"><Link2/><input type="text" value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://website.example/path" required/></div><button disabled={busy} className="btn primary">{busy?'Checking live signals…':'Analyze URL'} <Search size={17}/></button></form><p className="tiny">This scan resolves public DNS records and makes bounded HTTP(S) requests to inspect redirects. It does not run webpage scripts or open the link in your browser.</p>{error&&<div className="alert error">{error}</div>}</div>
+ {result?<div className="panel live-report-panel"><LiveResult result={result}/></div>:<div className="panel url-placeholder"><div className="empty-state"><Network size={43}/><strong>Ready for live website analysis</strong><p>Live DNS and guarded redirect inspection work without external API keys.</p></div></div>}
+ </>}
